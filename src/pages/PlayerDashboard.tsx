@@ -82,7 +82,18 @@ export const PlayerDashboard: React.FC = () => {
             {isMobile && (
                 <div style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333', background: '#0a0a0a' }}>
                     <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>ROOK & PAWN</div>
-                    <button onClick={() => navigate('/arena')} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>Play Now</button>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <button onClick={() => navigate('/arena')} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: '#333', border: 'none', color: '#fff', borderRadius: '4px' }}>Play</button>
+                        <button
+                            onClick={async () => {
+                                await supabase.auth.signOut();
+                                navigate('/');
+                            }}
+                            style={{ padding: '0.4rem', background: 'transparent', border: 'none', color: '#666' }}
+                        >
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Logout</span>
+                        </button>
+                    </div>
                 </div>
             )}
 

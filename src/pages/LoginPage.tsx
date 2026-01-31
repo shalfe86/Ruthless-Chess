@@ -72,7 +72,24 @@ export const LoginPage: React.FC = () => {
             padding: '2rem'
         }}>
             <div style={{ width: '100%', maxWidth: '400px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '2rem', position: 'relative' }}>
+                    <button
+                        onClick={() => navigate('/')}
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: -40,
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#666',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        ← Home
+                    </button>
                     <img src={logo} alt="Ruthless Chess" style={{ width: '60px', marginBottom: '1rem', opacity: 0.8 }} />
                     <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Welcome Back</h1>
                     <p style={{ color: '#888' }}>Enter the arena once more.</p>

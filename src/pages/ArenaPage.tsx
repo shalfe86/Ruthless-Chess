@@ -81,7 +81,7 @@ export const ArenaPage: React.FC = () => {
                     icon={<Zap size={32} color="var(--color-primary)" />}
                     title="Free Play"
                     desc="Challenge the Ruthless Engine. No rating, just pure chess. Test your skills."
-                    onClick={() => navigate('/play')}
+                    onClick={() => navigate('/game')}
                     active={true}
                 />
                 <ArenaCard

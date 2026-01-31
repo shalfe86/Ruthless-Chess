@@ -25,7 +25,7 @@ function App() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/play" element={<GamePage />} />
+          <Route path="/game" element={<GamePage />} />
           <Route path="/arena" element={<ArenaPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/signup" element={<SignupPage />} />
