@@ -55,32 +55,68 @@ export const PlayerDashboard: React.FC = () => {
 
     const isPremium = profile?.is_premium === true;
 
+    // Media query hook (duplicated for now - should move to util)
+    function useMedia(query: string) {
+        const [matches, setMatches] = useState(window.matchMedia(query).matches);
+
+        useEffect(() => {
+            const media = window.matchMedia(query);
+            if (media.matches !== matches) {
+                setMatches(media.matches);
+            }
+            const listener = () => setMatches(media.matches);
+            media.addEventListener('change', listener);
+            return () => media.removeEventListener('change', listener);
+        }, [query]);
+
+        return matches;
+    }
+
+    const isMobile = useMedia('(max-width: 768px)');
+
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', background: '#050505', color: '#fff', fontFamily: 'Inter, sans-serif' }}>
-            <Sidebar isPremium={isPremium} />
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100vh', background: '#050505', color: '#fff', fontFamily: 'Inter, sans-serif' }}>
+            <div className={isMobile ? 'mobile-hidden' : ''}>
+                <Sidebar isPremium={isPremium} />
+            </div>
+
+            {/* Mobile Header (simplified) */}
+            {isMobile && (
+                <div style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
+                    <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>RH CHESS</div>
+                    <button onClick={() => navigate('/arena')} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>Play Now</button>
+                </div>
+            )}
 
             {/* Main Content Area */}
-            <div style={{ marginLeft: '240px', padding: '2rem', width: '100%' }}>
+            <div style={{ marginLeft: isMobile ? 0 : '240px', padding: isMobile ? '1rem' : '2rem', width: '100%' }}>
 
-                {/* Top Header */}
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-                    <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0.75rem 1.5rem', borderRadius: '100px', width: '300px', gap: '0.75rem' }}>
-                        <Search size={18} color="#666" />
-                        <input placeholder="Search metrics, reports..." style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%' }} />
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                        <button className="glass-panel" style={{ padding: '0.75rem', borderRadius: '50%', display: 'flex' }}><Bell size={20} /></button>
-                        <div className="glass-panel" style={{ padding: '0.5rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(45deg, #dc2626, #fca5a5)' }} />
-                            <span style={{ fontWeight: 'bold' }}>{profile?.username}</span>
-                            <ChevronDown size={16} color="#666" />
+                {/* Top Header - Hide on mobile */}
+                {!isMobile && (
+                    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+                        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0.75rem 1.5rem', borderRadius: '100px', width: '300px', gap: '0.75rem' }}>
+                            <Search size={18} color="#666" />
+                            <input placeholder="Search metrics, reports..." style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%' }} />
                         </div>
-                    </div>
-                </header>
 
-                {/* KPI Cards Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                            <button className="glass-panel" style={{ padding: '0.75rem', borderRadius: '50%', display: 'flex' }}><Bell size={20} /></button>
+                            <div className="glass-panel" style={{ padding: '0.5rem 1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(45deg, #dc2626, #fca5a5)' }} />
+                                <span style={{ fontWeight: 'bold' }}>{profile?.username}</span>
+                                <ChevronDown size={16} color="#666" />
+                            </div>
+                        </div>
+                    </header>
+                )}
+
+                {/* KPI Cards Row - Responsive Grid */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                    gap: isMobile ? '0.75rem' : '1.5rem',
+                    marginBottom: '2rem'
+                }}>
                     <StatCard title="Total Games" value={analytics?.total_games.toString() || "0"} trend="" trendUp={true} data={mockSparkline} color="#8b5cf6" />
 
                     {/* GATED: Global Rank */}
@@ -99,8 +135,13 @@ export const PlayerDashboard: React.FC = () => {
                     <StatCard title="Wins" value={analytics?.wins.toString() || "0"} trend="" trendUp={true} data={mockSparkline} color="#10b981" />
                 </div>
 
-                {/* Charts Grid - GATED */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                {/* Charts Grid - GATED - Stack on mobile */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
+                    gap: isMobile ? '1rem' : '1.5rem',
+                    marginBottom: '2rem'
+                }}>
 
                     {/* Main Chart: Rating Over Time */}
                     <div className="glass-panel" style={{ borderRadius: '24px', overflow: 'hidden' }}>

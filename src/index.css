@@ -340,3 +340,30 @@ button:focus-visible {
 .animate-pulse-slow {
   animation: pulseSlow 6s ease-in-out infinite;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  body {
+    font-size: 14px;
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+}

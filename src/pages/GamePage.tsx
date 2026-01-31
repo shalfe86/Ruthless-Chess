@@ -389,26 +389,45 @@ export const GamePage: React.FC = () => {
         }
     }, [game, gameOver, activeTurn, playerColor, gameStarted, currentGameId, moveCount, whiteTime]);
 
+    // Media query hook
+    const isMobile = useMedia('(max-width: 768px)');
+
+    // Dynamic styles based on screen size
+    const containerStyle: React.CSSProperties = isMobile ? {
+        minHeight: '100vh', // use minHeight to allow scrolling
+        width: '100vw',
+        background: '#0a0a0a',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '1rem',
+        gap: '1rem',
+        paddingTop: '3.5rem' // space for leave button
+    } : {
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden',
+        background: '#0a0a0a',
+        display: 'grid',
+        gridTemplateColumns: 'minmax(280px, 300px) 1fr minmax(280px, 300px)',
+        gap: '1.5rem',
+        padding: '1.5rem',
+        position: 'relative'
+    };
+
+    const boardSize = isMobile ? 'min(90vw, 90vw)' : '60vh';
+
     return (
-        <div style={{
-            height: '100vh',
-            width: '100vw',
-            overflow: 'hidden',
-            background: '#0a0a0a',
-            display: 'grid',
-            gridTemplateColumns: 'minmax(280px, 300px) 1fr minmax(280px, 300px)',
-            gap: '1.5rem',
-            padding: '1.5rem',
-            position: 'relative'
-        }}>
-            {/* Quit Button */}
+        <div style={containerStyle}>
+            {/* Quit Button - positioned slightly differently on mobile */}
             <button
                 onClick={() => navigate('/arena')}
                 style={{
-                    position: 'absolute',
-                    top: '1rem',
-                    right: '1rem',
-                    padding: '0.5rem 1rem',
+                    position: isMobile ? 'absolute' : 'absolute',
+                    top: isMobile ? '0.5rem' : '1rem',
+                    left: isMobile ? '0.5rem' : 'auto', // Top left on mobile
+                    right: isMobile ? 'auto' : '1rem',
+                    padding: '0.4rem 0.8rem',
+                    fontSize: isMobile ? '0.8rem' : '1rem',
                     background: 'transparent',
                     border: '1px solid #444',
                     color: '#fff',
@@ -416,34 +435,51 @@ export const GamePage: React.FC = () => {
                     zIndex: 100
                 }}
             >
-                ← Leave Game
+                ← Leave
             </button>
 
-            {/* Left Panel: Opponent Info & Analytics */}
-            <div className="panel" style={panelStyle}>
-                <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-                    <img src={logo} alt="Ruthless Chess" style={{ width: '80%', opacity: 0.9 }} />
-                </div>
+            {/* Left Panel: Opponent Info & Analytics - Mobile: Collapsible or Stacked? Stacked for now, simplified */}
+            {!isMobile && (
+                <div className="panel" style={panelStyle}>
+                    <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                        <img src={logo} alt="Ruthless Chess" style={{ width: '80%', opacity: 0.9 }} />
+                    </div>
 
-                <div className="opponent-card" style={cardStyle}>
-                    <h3>Ruthless AI (Bot)</h3>
-                    <div style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>Rank: ???</div>
-                </div>
+                    <div className="opponent-card" style={cardStyle}>
+                        <h3>Ruthless AI (Bot)</h3>
+                        <div style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>Rank: ???</div>
+                    </div>
 
-                <div className="analytics-card" style={{ ...cardStyle, marginTop: 'auto' }}>
-                    <h4><BarChart2 size={16} style={{ display: 'inline', marginRight: 8 }} /> Live Analytics</h4>
-                    <p style={{ fontSize: '0.9rem', color: '#888' }}>Real-time engine evaluation</p>
-                    <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <div>Accuracy: <span style={{ color: liveStats.accuracy > 80 ? '#22c55e' : liveStats.accuracy > 50 ? '#eab308' : '#ef4444', fontWeight: 'bold' }}>{liveStats.accuracy > 0 ? `${liveStats.accuracy}%` : '-'}</span></div>
-                        <div>Brilliant: <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{liveStats.brilliant}</span></div>
-                        <div>Mistakes: <span style={{ color: '#eab308', fontWeight: 'bold' }}>{liveStats.mistakes}</span></div>
-                        <div>Blunders: <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{liveStats.blunders}</span></div>
+                    <div className="analytics-card" style={{ ...cardStyle, marginTop: 'auto' }}>
+                        <h4><BarChart2 size={16} style={{ display: 'inline', marginRight: 8 }} /> Live Analytics</h4>
+                        <p style={{ fontSize: '0.9rem', color: '#888' }}>Real-time engine evaluation</p>
+                        <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <div>Accuracy: <span style={{ color: liveStats.accuracy > 80 ? '#22c55e' : liveStats.accuracy > 50 ? '#eab308' : '#ef4444', fontWeight: 'bold' }}>{liveStats.accuracy > 0 ? `${liveStats.accuracy}%` : '-'}</span></div>
+                            <div>Brilliant: <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{liveStats.brilliant}</span></div>
+                            <div>Mistakes: <span style={{ color: '#eab308', fontWeight: 'bold' }}>{liveStats.mistakes}</span></div>
+                            <div>Blunders: <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{liveStats.blunders}</span></div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* Mobile Header: Opponent Info only */}
+            {isMobile && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>Vs. Ruthless AI</div>
+                </div>
+            )}
+
 
             {/* Center: Board */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', height: '100%' }}>
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: isMobile ? 'flex-start' : 'center',
+                position: 'relative',
+                height: isMobile ? 'auto' : '100%'
+            }}>
 
                 {!gameStarted && !gameOver && (
                     <div style={{
@@ -464,9 +500,9 @@ export const GamePage: React.FC = () => {
                 )}
 
                 {/* Opponent Timer */}
-                <TimerDisplay time={blackTime} isActive={activeTurn === 'b'} label="AI" />
+                <TimerDisplay time={blackTime} isActive={activeTurn === 'b'} label="AI" isMobile={isMobile} />
 
-                <div className="board-container" style={{ width: '60vh', height: '60vh', margin: '2rem 0', flexShrink: 0 }}>
+                <div className="board-container" style={{ width: boardSize, height: boardSize, margin: isMobile ? '1rem 0' : '2rem 0', flexShrink: 0 }}>
                     <Chessboard
                         options={{
                             position: fen,
@@ -483,7 +519,7 @@ export const GamePage: React.FC = () => {
                 </div>
 
                 {/* Player Timer */}
-                <TimerDisplay time={whiteTime} isActive={activeTurn === 'w'} label="YOU" />
+                <TimerDisplay time={whiteTime} isActive={activeTurn === 'w'} label="YOU" isMobile={isMobile} />
 
                 {/* Cinematic Overlay Trigger - DISABLED */}
                 {/* {showCinematic && gameResult && (
@@ -599,13 +635,19 @@ export const GamePage: React.FC = () => {
                 )}
             </div>
 
-            {/* Right Panel: Move History / Chat */}
-            <div className="panel" style={panelStyle}>
+            {/* Right Panel: Move History / Chat - On mobile, put underneath */}
+            <div className="panel" style={{
+                ...panelStyle,
+                order: isMobile ? 3 : 0, // Flex order
+                maxHeight: isMobile ? '200px' : 'none',
+                height: isMobile ? 'auto' : '100%',
+                flex: isMobile ? 'none' : 1
+            }}>
                 <h3>Move History</h3>
                 <div ref={moveListRef} style={{
                     flex: 1,
                     overflowY: 'auto',
-                    minHeight: 0, // Critical for flex scrolling
+                    minHeight: isMobile ? '100px' : 0,
                     marginTop: '1rem',
                     fontFamily: 'monospace',
                     color: '#aaa',
@@ -624,11 +666,42 @@ export const GamePage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Mobile Analytics (Moved from side to bottom) */}
+            {isMobile && (
+                <div className="analytics-card" style={{ ...cardStyle, order: 4 }}>
+                    <h4 style={{ fontSize: '0.9rem' }}><BarChart2 size={14} style={{ display: 'inline', marginRight: 8 }} /> Live Analytics</h4>
+                    <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                        <div>Acc: <span style={{ color: liveStats.accuracy > 80 ? '#22c55e' : liveStats.accuracy > 50 ? '#eab308' : '#ef4444', fontWeight: 'bold' }}>{liveStats.accuracy > 0 ? `${liveStats.accuracy}%` : '-'}</span></div>
+                        <div>💎 <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{liveStats.brilliant}</span></div>
+                        <div>❓ <span style={{ color: '#eab308', fontWeight: 'bold' }}>{liveStats.mistakes}</span></div>
+                        <div>❌ <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{liveStats.blunders}</span></div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-const TimerDisplay = React.memo(({ time, isActive, label }: { time: number; isActive: boolean; label: string }) => {
+// Hook for media query
+function useMedia(query: string) {
+    const [matches, setMatches] = useState(window.matchMedia(query).matches);
+
+    useEffect(() => {
+        const media = window.matchMedia(query);
+        if (media.matches !== matches) {
+            setMatches(media.matches);
+        }
+        const listener = () => setMatches(media.matches);
+        media.addEventListener('change', listener);
+        return () => media.removeEventListener('change', listener);
+    }, [query]);
+
+    return matches;
+}
+
+
+const TimerDisplay = React.memo(({ time, isActive, label, isMobile }: { time: number; isActive: boolean; label: string, isMobile?: boolean }) => {
     const minutes = Math.floor(Math.max(0, time) / 60);
     const seconds = Math.floor(Math.max(0, time) % 60);
     const decimal = Math.floor((Math.max(0, time) % 1) * 10);
@@ -638,25 +711,25 @@ const TimerDisplay = React.memo(({ time, isActive, label }: { time: number; isAc
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
-            padding: '0.5rem 1.5rem',
+            padding: isMobile ? '0.3rem 1rem' : '0.5rem 1.5rem',
             background: isActive ? 'var(--color-surface-2)' : 'transparent',
             borderRadius: '8px',
             border: isActive ? '1px solid var(--color-primary)' : '1px solid transparent',
             width: '100%',
-            maxWidth: '400px',
+            maxWidth: isMobile ? '90vw' : '400px',
             transition: 'all 0.2s'
         }}>
-            <div style={{ fontWeight: 'bold', color: '#888' }}>{label}</div>
+            <div style={{ fontWeight: 'bold', color: '#888', fontSize: isMobile ? '0.9rem' : '1rem' }}>{label}</div>
             <div style={{
                 marginLeft: 'auto',
-                fontSize: '2rem',
+                fontSize: isMobile ? '1.5rem' : '2rem',
                 fontFamily: 'monospace',
                 fontWeight: 'bold',
                 color: time < 10 ? 'var(--color-primary)' : 'white'
             }}>
                 {minutes}:{seconds.toString().padStart(2, '0')}.{decimal}
             </div>
-            <Clock size={20} color={isActive ? 'var(--color-primary)' : '#444'} />
+            <Clock size={isMobile ? 16 : 20} color={isActive ? 'var(--color-primary)' : '#444'} />
         </div>
     );
 });
