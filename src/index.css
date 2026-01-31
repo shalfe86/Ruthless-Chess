@@ -1,0 +1,342 @@
+:root {
+  --font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+
+  --color-bg: #050505;
+  --color-surface-1: #121212;
+  --color-surface-2: #1e1e1e;
+  --color-primary: #dc2626;
+  /* Ruthless red */
+  --color-primary-hover: #b91c1c;
+  --color-text-main: #f5f5f5;
+  --color-text-muted: #a3a3a3;
+  --color-accent: #fcd34d;
+  /* Gold for ranking/premium */
+
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 4rem;
+
+  --border-radius: 8px;
+
+  --shadow-glow: 0 0 20px rgba(220, 38, 38, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.1;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+button {
+  border-radius: 12px;
+  /* Smooth rounded */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.8em 1.5em;
+  /* Slightly larger touch target */
+  font-size: 1em;
+  font-weight: 600;
+  font-family: inherit;
+
+  /* Liquid Dark Base */
+  background: linear-gradient(180deg, rgba(30, 30, 30, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
+  color: var(--color-text-main);
+
+  /* Glossy Top + Shadow */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 4px 6px rgba(0, 0, 0, 0.3);
+
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  backdrop-filter: blur(4px);
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover {
+  border-color: var(--color-primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 15px rgba(220, 38, 38, 0.4);
+  transform: translateY(-1px);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* Utilities */
+.text-primary {
+  color: var(--color-primary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.bg-surface {
+  background: var(--color-surface-1);
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.w-full {
+  width: 100%;
+}
+
+/* Hero Animation */
+
+/* Logo "Slam" - simplified, pure scale */
+/* Hero Animation: Studio Light */
+
+/* 
+   Gradient is 400% width.
+   Slit is at 50% of 400% = 200% mark.
+   
+   Positions:
+   Left Offscreen: ~85% bg-position
+   Right Offscreen: ~15% bg-position
+   Center: 50% bg-position
+*/
+@keyframes studioLightMove {
+  0% {
+    background-position: 85% 50%;
+  }
+
+  45% {
+    background-position: 15% 50%;
+  }
+
+  /* Sweep Right */
+
+  /* Swing back to center */
+  65% {
+    background-position: 50% 50%;
+  }
+
+  90% {
+    background-position: 50% 50%;
+    opacity: 1;
+  }
+
+  100% {
+    background-position: 50% 50%;
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes contentIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.hero-bg-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.hero-bg-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.15);
+  /* No intro anims on the image itself, it waits for the light */
+}
+
+/* The Studio Overlay Mask */
+.studio-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg,
+      #000 0%,
+      #000 45%,
+      transparent 48%,
+      rgba(255, 255, 255, 0.1) 50%,
+      /* Tiny highlight in the middle */
+      transparent 52%,
+      #000 55%,
+      #000 100%);
+  background-size: 400% 100%;
+  z-index: 50;
+  animation: studioLightMove 4s cubic-bezier(0.45, 0, 0.15, 1) forwards;
+  pointer-events: none;
+}
+
+/* Content sits underneath, visible but hidden by the black mask overlay */
+.landing-content-static {
+  opacity: 1;
+}
+
+/* Modal Animations */
+@keyframes modalBackdropFade {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes modalZoomIn {
+  0% {
+    opacity: 0;
+    transform: scale(2.5);
+    filter: blur(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.modal-backdrop {
+  animation: modalBackdropFade 0.5s ease-out forwards;
+}
+
+.modal-content {
+  animation: modalZoomIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+  /* Start hidden */
+}
+
+/* Liquid Glassmorphism Utilities */
+
+.glass-panel {
+  /* Ultra transparent base with top-left light source */
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+
+  /* Milky Blur */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  /* Realistic Edge */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  /* Stronger top light highlight */
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  /* Stronger left light highlight */
+
+  /* Deep depth + Thickness simulation */
+  box-shadow:
+    0 8px 32px 0 rgba(0, 0, 0, 0.5),
+    /* Deep external shadow */
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
+  /* Glossy top edge */
+
+  border-radius: 24px;
+  /* Organic/Liquid feel */
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.glass-card:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border-color: rgba(220, 38, 38, 0.5);
+  /* Primary color hint */
+  box-shadow:
+    0 12px 40px rgba(220, 38, 38, 0.2),
+    /* Glow */
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  transform: translateY(-4px) scale(1.01);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Recharts Tooltip Override */
+.recharts-default-tooltip {
+  background-color: rgba(10, 10, 10, 0.9) !important;
+  border: 1px solid #333 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Custom Pulse Animation for Arena */
+@keyframes pulseSlow {
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 6s ease-in-out infinite;
+}
