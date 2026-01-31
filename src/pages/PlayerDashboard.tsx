@@ -7,7 +7,7 @@ import { PremiumGate } from '../components/PremiumGate'; // Import Gate
 import { Search, Bell, ChevronDown, Activity, Skull, Zap, Target } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getPlayerAnalytics, getRatingHistory, getSkillBreakdown } from '../lib/analytics';
-import type { PlayerAnalytics, RatingHistory } from '../types/database';
+import type { PlayerAnalytics } from '../types/database';
 
 const mockSparkline = Array.from({ length: 10 }, () => ({ value: Math.random() * 100 }));
 
