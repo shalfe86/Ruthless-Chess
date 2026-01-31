@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { Clock, BarChart2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { RuthlessEngine } from '../lib/RuthlessEngine';
 import { createGame, updateGame, createMove, formatMoveForDatabase } from '../lib/database';
@@ -14,6 +14,9 @@ const engine = new RuthlessEngine();
 
 export const GamePage: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const isGuest = location.state?.isGuest || false;
+
     const [game, setGame] = useState(new Chess());
     const [fen, setFen] = useState(game.fen());
     const [playerColor] = useState<'w' | 'b'>('w'); // Player is always white for now
@@ -420,7 +423,7 @@ export const GamePage: React.FC = () => {
         <div style={containerStyle}>
             {/* Quit Button - positioned slightly differently on mobile */}
             <button
-                onClick={() => navigate('/arena')}
+                onClick={() => navigate(isGuest ? '/' : '/arena')}
                 style={{
                     position: isMobile ? 'absolute' : 'absolute',
                     top: isMobile ? '0.5rem' : '1rem',
@@ -435,7 +438,7 @@ export const GamePage: React.FC = () => {
                     zIndex: 100
                 }}
             >
-                ← Leave
+                {isGuest ? '← Home' : '← Leave'}
             </button>
 
             {/* Left Panel: Opponent Info & Analytics - Mobile: Collapsible or Stacked? Stacked for now, simplified */}
@@ -463,10 +466,26 @@ export const GamePage: React.FC = () => {
                 </div>
             )}
 
-            {/* Mobile Header: Opponent Info only */}
+            {/* Mobile Header: Opponent Info & Sign Up */}
             {isMobile && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.5rem' }}>
                     <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>Vs. Ruthless AI</div>
+                    {isGuest && (
+                        <button
+                            onClick={() => navigate('/pricing')}
+                            style={{
+                                background: 'var(--color-primary)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '0.3rem 0.8rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Sign Up
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -536,7 +555,6 @@ export const GamePage: React.FC = () => {
                 {/* Fading Backdrop (only visible when modal is) */}
                 {/* REMOVED: Separate backdrop causing click blocking issues. The Modal below handles its own backdrop. */}
 
-                {/* Game Over Modal */}
                 {showModal && gameResult && (
                     <div className="modal-backdrop" style={{
                         position: 'fixed',
@@ -544,9 +562,9 @@ export const GamePage: React.FC = () => {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.85)', // Stronger background
-                        backdropFilter: 'blur(10px)', // Apply blur here directly
-                        zIndex: 2000, // Very high Z-Index
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        backdropFilter: 'blur(10px)',
+                        zIndex: 2000,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
@@ -557,7 +575,9 @@ export const GamePage: React.FC = () => {
                             padding: '3rem',
                             borderRadius: '16px',
                             textAlign: 'center',
-                            maxWidth: '500px'
+                            maxWidth: '500px',
+                            position: 'relative',
+                            overflow: 'hidden'
                         }}>
                             <h2 style={{
                                 fontSize: '1.2rem',
@@ -570,33 +590,67 @@ export const GamePage: React.FC = () => {
                                 {gameResult.subtitle}
                             </h2>
 
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr 1fr 1fr',
-                                gap: '1rem',
-                                marginBottom: '2.5rem',
-                                background: 'rgba(255,255,255,0.05)',
-                                padding: '1rem',
-                                borderRadius: '12px'
-                            }}>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#888' }}>Accuracy</div>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: liveStats.accuracy > 80 ? '#22c55e' : '#fff' }}>
-                                        {liveStats.accuracy}%
+                            <div style={{ position: 'relative' }}>
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                                    gap: '1rem',
+                                    marginBottom: '2.5rem',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    filter: isGuest ? 'blur(8px)' : 'none',
+                                    opacity: isGuest ? 0.6 : 1
+                                }}>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Accuracy</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: liveStats.accuracy > 80 ? '#22c55e' : '#fff' }}>
+                                            {liveStats.accuracy}%
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Brilliant</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#22c55e' }}>{liveStats.brilliant}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Mistakes</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#eab308' }}>{liveStats.mistakes}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Blunders</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ef4444' }}>{liveStats.blunders}</div>
                                     </div>
                                 </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#888' }}>Brilliant</div>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#22c55e' }}>{liveStats.brilliant}</div>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#888' }}>Mistakes</div>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#eab308' }}>{liveStats.mistakes}</div>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#888' }}>Blunders</div>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ef4444' }}>{liveStats.blunders}</div>
-                                </div>
+
+                                {isGuest && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        transform: 'translate(-50%, -50%)',
+                                        zIndex: 10,
+                                        width: '100%',
+                                        textAlign: 'center'
+                                    }}>
+                                        <p style={{ fontWeight: 'bold', marginBottom: '1rem', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                                            Sign up to see your analytics
+                                        </p>
+                                        <button
+                                            onClick={() => navigate('/pricing')}
+                                            style={{
+                                                padding: '0.6rem 1.2rem',
+                                                background: 'var(--color-primary)',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Unlock Stats
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
@@ -616,7 +670,7 @@ export const GamePage: React.FC = () => {
                                     REMATCH
                                 </button>
                                 <button
-                                    onClick={() => navigate('/arena')}
+                                    onClick={() => navigate(isGuest ? '/' : '/arena')}
                                     style={{
                                         fontSize: '1rem',
                                         padding: '0.8rem 2rem',

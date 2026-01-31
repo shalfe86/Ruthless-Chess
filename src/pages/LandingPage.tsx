@@ -66,7 +66,7 @@ export const LandingPage: React.FC = () => {
                             Sign Up
                         </button>
                         <button
-                            onClick={() => navigate('/arena')}
+                            onClick={() => navigate('/game', { state: { isGuest: true } })}
                             style={{
                                 padding: '1rem 3rem',
                                 fontSize: '1.2rem',
