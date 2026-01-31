@@ -34,34 +34,30 @@ export class StockfishEngine {
 
         this.initPromise = new Promise((resolve, reject) => {
             try {
-                // Import Stockfish using the correct path
-                // The stockfish package exports a function that returns a Worker-like object
-                // @ts-ignore
-                import('stockfish/src/stockfish.js').then((module) => {
-                    // The module default export is a function that creates the engine
-                    const StockfishConstructor = module.default || module;
-                    this.engine = StockfishConstructor();
+                // Initialize worker from public static file
+                // This avoids build-time resolution issues with the stockfish package
+                const worker = new Worker('/stockfish.js');
+                this.engine = worker;
 
-                    // Wait for engine to be ready
-                    this.engine.onmessage = (event: MessageEvent) => {
-                        const message = event.data || event;
-                        if (message === 'uciok' || message.includes('uciok')) {
-                            this.ready = true;
-                            console.log('🧠 Stockfish engine initialized');
-                            resolve();
-                        }
-                    };
+                // Wait for engine to be ready
+                this.engine.onmessage = (event: MessageEvent) => {
+                    const message = event.data || event;
+                    if (message === 'uciok' || message.includes('uciok')) {
+                        this.ready = true;
+                        console.log('🧠 Stockfish engine initialized');
+                        resolve();
+                    }
+                };
 
-                    // Initialize UCI protocol
-                    this.engine.postMessage('uci');
+                // Initialize UCI protocol
+                this.engine.postMessage('uci');
 
-                    // Timeout after 10 seconds
-                    setTimeout(() => {
-                        if (!this.ready) {
-                            reject(new Error('Stockfish initialization timeout'));
-                        }
-                    }, 10000);
-                }).catch(reject);
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    if (!this.ready) {
+                        reject(new Error('Stockfish initialization timeout'));
+                    }
+                }, 10000);
             } catch (error) {
                 reject(error);
             }
