@@ -36,6 +36,7 @@ export class StockfishEngine {
             try {
                 // Import Stockfish using the correct path
                 // The stockfish package exports a function that returns a Worker-like object
+                // @ts-ignore
                 import('stockfish/src/stockfish.js').then((module) => {
                     // The module default export is a function that creates the engine
                     const StockfishConstructor = module.default || module;

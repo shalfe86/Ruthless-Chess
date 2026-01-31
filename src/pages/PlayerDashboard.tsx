@@ -6,8 +6,8 @@ import { StatCard } from '../components/Dashboard/StatCard';
 import { PremiumGate } from '../components/PremiumGate'; // Import Gate
 import { Search, Bell, ChevronDown, Activity, Skull, Zap, Target } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getPlayerAnalytics, getRecentGames, getRatingHistory, getSkillBreakdown } from '../lib/analytics';
-import type { PlayerAnalytics, Game } from '../types/database';
+import { getPlayerAnalytics, getRatingHistory, getSkillBreakdown } from '../lib/analytics';
+import type { PlayerAnalytics, RatingHistory } from '../types/database';
 
 const mockSparkline = Array.from({ length: 10 }, () => ({ value: Math.random() * 100 }));
 
@@ -16,7 +16,6 @@ export const PlayerDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<any>(null);
     const [analytics, setAnalytics] = useState<PlayerAnalytics | null>(null);
-    const [recentGames, setRecentGames] = useState<Game[]>([]);
     const [ratingHistory, setRatingHistory] = useState<any[]>([]);
     const [skillBreakdown, setSkillBreakdown] = useState({ difficulty: 0, speed: 0, pressure: 0, accuracy: 0 });
 
@@ -36,9 +35,9 @@ export const PlayerDashboard: React.FC = () => {
             setAnalytics(analyticsData);
 
             // Fetch recent games
-            const games = await getRecentGames(user.id, 5);
-            setRecentGames(games);
-
+            // if (games) {
+            //     // setRecentGames(games);
+            // }
             // Fetch rating history
             const history = await getRatingHistory(user.id);
             setRatingHistory(history);

@@ -205,5 +205,13 @@ export function formatMoveForDatabase(
         is_castling: move.flags.includes('k') || move.flags.includes('q'),
         is_promotion: move.promotion !== undefined,
         is_en_passant: move.flags.includes('e'),
+        evaluation_before: null,
+        evaluation_after: null,
+        centipawn_loss: null,
+        best_move: null,
+        classification: null,
+        is_brilliant: false,
+        is_mistake: false,
+        is_blunder: false
     };
 }
