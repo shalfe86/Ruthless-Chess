@@ -11,6 +11,23 @@ import type { PlayerAnalytics } from '../types/database';
 
 const mockSparkline = Array.from({ length: 10 }, () => ({ value: Math.random() * 100 }));
 
+// Hook for media query defined outside component
+function useMedia(query: string) {
+    const [matches, setMatches] = useState(window.matchMedia(query).matches);
+
+    useEffect(() => {
+        const media = window.matchMedia(query);
+        if (media.matches !== matches) {
+            setMatches(media.matches);
+        }
+        const listener = () => setMatches(media.matches);
+        media.addEventListener('change', listener);
+        return () => media.removeEventListener('change', listener);
+    }, [query]);
+
+    return matches;
+}
+
 export const PlayerDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -18,6 +35,8 @@ export const PlayerDashboard: React.FC = () => {
     const [analytics, setAnalytics] = useState<PlayerAnalytics | null>(null);
     const [ratingHistory, setRatingHistory] = useState<any[]>([]);
     const [skillBreakdown, setSkillBreakdown] = useState({ difficulty: 0, speed: 0, pressure: 0, accuracy: 0 });
+
+    const isMobile = useMedia('(max-width: 768px)');
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -34,10 +53,6 @@ export const PlayerDashboard: React.FC = () => {
             const analyticsData = await getPlayerAnalytics(user.id);
             setAnalytics(analyticsData);
 
-            // Fetch recent games
-            // if (games) {
-            //     // setRecentGames(games);
-            // }
             // Fetch rating history
             const history = await getRatingHistory(user.id);
             setRatingHistory(history);
@@ -55,41 +70,24 @@ export const PlayerDashboard: React.FC = () => {
 
     const isPremium = profile?.is_premium === true;
 
-    // Media query hook (duplicated for now - should move to util)
-    function useMedia(query: string) {
-        const [matches, setMatches] = useState(window.matchMedia(query).matches);
-
-        useEffect(() => {
-            const media = window.matchMedia(query);
-            if (media.matches !== matches) {
-                setMatches(media.matches);
-            }
-            const listener = () => setMatches(media.matches);
-            media.addEventListener('change', listener);
-            return () => media.removeEventListener('change', listener);
-        }, [query]);
-
-        return matches;
-    }
-
-    const isMobile = useMedia('(max-width: 768px)');
-
     return (
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100vh', background: '#050505', color: '#fff', fontFamily: 'Inter, sans-serif' }}>
-            <div className={isMobile ? 'mobile-hidden' : ''}>
-                <Sidebar isPremium={isPremium} />
-            </div>
+            {!isMobile && (
+                <div style={{ width: '240px', flexShrink: 0 }}>
+                    <Sidebar isPremium={isPremium} />
+                </div>
+            )}
 
-            {/* Mobile Header (simplified) */}
+            {/* Mobile Header */}
             {isMobile && (
-                <div style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-                    <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>RH CHESS</div>
+                <div style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333', background: '#0a0a0a' }}>
+                    <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>ROOK & PAWN</div>
                     <button onClick={() => navigate('/arena')} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>Play Now</button>
                 </div>
             )}
 
             {/* Main Content Area */}
-            <div style={{ marginLeft: isMobile ? 0 : '240px', padding: isMobile ? '1rem' : '2rem', width: '100%' }}>
+            <div style={{ flex: 1, padding: isMobile ? '1rem' : '2rem', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
 
                 {/* Top Header - Hide on mobile */}
                 {!isMobile && (
