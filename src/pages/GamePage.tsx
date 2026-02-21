@@ -181,7 +181,8 @@ export const GamePage: React.FC = () => {
 
 
             // Increment time for Black (AI), capped at 25s
-            setBlackTime(t => Math.min(t + 1, 25));
+            const increment = difficulty === 'Executioner' ? 1 : difficulty === 'Relentless' ? 1.5 : 2;
+            setBlackTime(t => Math.min(t + increment, 25));
             setActiveTurn('w');
         } catch (error) {
             console.error("FATAL: Error in makeRuthlessMove:", error);
@@ -258,7 +259,8 @@ export const GamePage: React.FC = () => {
             setMoveHistory(prev => [...prev, `${move.color === 'w' ? 'White' : 'Black'}: ${move.san}`]);
 
             // Increment time for White (Player), capped at 25s
-            setWhiteTime(t => Math.min(t + 1, 25));
+            const increment = difficulty === 'Executioner' ? 1 : difficulty === 'Relentless' ? 1.5 : 2;
+            setWhiteTime(t => Math.min(t + increment, 25));
             setActiveTurn('b');
 
             if (newGame.isGameOver()) {
