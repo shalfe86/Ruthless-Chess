@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Swords, Crown, Zap } from 'lucide-react';
+import { claimUsername } from '../lib/database';
 import logo from '../assets/logo.png';
 import heroBg from '../assets/hero-bg.jpg';
 
@@ -8,6 +9,7 @@ export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
     const [showUsernameInput, setShowUsernameInput] = useState(false);
     const [username, setUsername] = useState(() => localStorage.getItem('ruthless_username') || '');
+    const [formError, setFormError] = useState('');
 
     return (
         <div className="landing-container" style={{ overflowX: 'hidden', background: '#000' }}>
@@ -84,31 +86,53 @@ export const LandingPage: React.FC = () => {
                                 </button>
                             </>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '400px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '450px' }}>
                                 <form
-                                    onSubmit={(e) => {
+                                    onSubmit={async (e) => {
                                         e.preventDefault();
                                         const finalName = username.trim();
-                                        if (finalName) {
-                                            localStorage.setItem('ruthless_username', finalName);
+                                        if (!finalName) {
+                                            navigate('/game', { state: { username: 'Anonymous' } });
+                                            return;
                                         }
-                                        navigate('/game', { state: { username: finalName || 'Anonymous' } });
+
+                                        const visitorId = localStorage.getItem('ruthless_visitor_id');
+                                        if (visitorId) {
+                                            setFormError('');
+                                            const claimed = await claimUsername(finalName, visitorId);
+                                            if (!claimed) {
+                                                setFormError('Username has been reserved by another player.');
+                                                return;
+                                            }
+                                        }
+
+                                        localStorage.setItem('ruthless_username', finalName);
+                                        navigate('/game', { state: { username: finalName } });
                                     }}
-                                    style={{ display: 'flex', gap: '1rem', width: '100%' }}
+                                    style={{
+                                        display: 'flex',
+                                        gap: '0.8rem',
+                                        width: '100%',
+                                        flexWrap: 'wrap',
+                                        justifyContent: 'center'
+                                    }}
                                 >
                                     <input
                                         type="text"
                                         placeholder="Enter username..."
                                         value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
+                                        onChange={(e) => {
+                                            setUsername(e.target.value);
+                                            setFormError('');
+                                        }}
                                         autoFocus
                                         maxLength={20}
                                         style={{
-                                            flex: 1,
+                                            flex: '1 1 200px',
                                             padding: '1rem',
                                             fontSize: '1.2rem',
                                             background: 'rgba(255,255,255,0.1)',
-                                            border: '1px solid #555',
+                                            border: formError ? '1px solid #dc2626' : '1px solid #555',
                                             color: 'white',
                                             borderRadius: '8px',
                                             outline: 'none'
@@ -125,14 +149,18 @@ export const LandingPage: React.FC = () => {
                                             boxShadow: 'var(--shadow-glow)',
                                             fontWeight: 'bold',
                                             cursor: 'pointer',
-                                            borderRadius: '8px'
+                                            borderRadius: '8px',
+                                            flex: '0 1 auto'
                                         }}
                                     >
                                         Start
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setShowUsernameInput(false)}
+                                        onClick={() => {
+                                            setShowUsernameInput(false);
+                                            setFormError('');
+                                        }}
                                         style={{
                                             padding: '1rem',
                                             fontSize: '1.2rem',
@@ -140,15 +168,21 @@ export const LandingPage: React.FC = () => {
                                             color: '#aaa',
                                             border: '1px solid #444',
                                             cursor: 'pointer',
-                                            borderRadius: '8px'
+                                            borderRadius: '8px',
+                                            flex: '0 1 auto'
                                         }}
                                         title="Cancel"
                                     >
                                         X
                                     </button>
                                 </form>
-                                <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#aaa' }}>
-                                    Enter a username to be eligible for <strong>shout-outs</strong> on our social media for your best sessions!
+                                {formError && (
+                                    <p style={{ marginTop: '0.5rem', color: '#ff4444', fontWeight: 'bold' }}>
+                                        {formError}
+                                    </p>
+                                )}
+                                <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#aaa', padding: '0 1rem' }}>
+                                    Enter a username to be eligible for <strong>shout-outs</strong> on our social media for your best sessions! Names lock for 30 days.
                                 </p>
                             </div>
                         )}

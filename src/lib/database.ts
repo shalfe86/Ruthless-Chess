@@ -185,3 +185,23 @@ export async function updateVisit(visitId: string, updates: SiteVisitUpdate): Pr
         return null;
     }
 }
+
+/**
+ * Claims or extends a username reservation for 30 days.
+ */
+export async function claimUsername(username: string, visitorId: string): Promise<boolean> {
+    try {
+        const { data, error } = await supabase
+            .rpc('claim_username', { p_username: username, p_visitor_id: visitorId });
+
+        if (error) {
+            console.error('Error claiming username:', error);
+            return false;
+        }
+
+        return data as boolean;
+    } catch (e) {
+        console.error('Failed to claim username:', e);
+        return false;
+    }
+}
