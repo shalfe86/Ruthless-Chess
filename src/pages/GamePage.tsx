@@ -195,10 +195,10 @@ export const GamePage: React.FC = () => {
         if (gameInstance.isCheckmate()) {
             if (gameInstance.turn() === 'w') {
                 // AI (Black) won
-                endGame("DEFEAT", getRandomTrashTalk('win'), 'loss');
+                endGame("CHECKMATED", getRandomTrashTalk('win'), 'loss');
             } else {
                 // Player (White) won
-                endGame("VICTORY", getRandomTrashTalk('loss'), 'win');
+                endGame("CHECKMATE - YOU WIN", getRandomTrashTalk('loss'), 'win');
             }
         } else if (gameInstance.isDraw()) {
             endGame('DRAW', 'Stalemate / Insufficient Material', 'draw');
@@ -266,7 +266,7 @@ export const GamePage: React.FC = () => {
             if (newGame.isGameOver()) {
                 if (newGame.isCheckmate()) {
                     // If game is over after player's move, player checkmated the AI
-                    endGame("CHECKMATE", getRandomTrashTalk('loss'), 'win');
+                    endGame("CHECKMATE - YOU WIN", getRandomTrashTalk('loss'), 'win');
                 } else {
                     endGame('DRAW', 'Stalemate / Repetition', 'draw');
                 }
@@ -428,6 +428,28 @@ export const GamePage: React.FC = () => {
                     </div>
                 )}
 
+                {gameOver && !showModal && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        style={{
+                            position: 'absolute',
+                            zIndex: 100,
+                            top: '45%',
+                            padding: '0.8rem 1.5rem',
+                            fontSize: '1.2rem',
+                            background: 'var(--color-primary)',
+                            color: 'white',
+                            border: 'none',
+                            boxShadow: 'var(--shadow-glow)',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            borderRadius: '8px'
+                        }}
+                    >
+                        Show Results
+                    </button>
+                )}
+
                 {/* Opponent Timer */}
                 <TimerDisplay time={blackTime} isActive={activeTurn === 'b'} label="AI" isMobile={isMobile} />
 
@@ -483,8 +505,19 @@ export const GamePage: React.FC = () => {
                             textAlign: 'center',
                             maxWidth: '500px',
                             position: 'relative',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.8)'
                         }}>
+                            <h1 style={{
+                                fontSize: '2.5rem',
+                                color: gameResult.type === 'win' ? '#22c55e' : gameResult.type === 'loss' ? '#dc2626' : '#aaa',
+                                marginBottom: '0.5rem',
+                                marginTop: 0,
+                                textTransform: 'uppercase',
+                                letterSpacing: '2px'
+                            }}>
+                                {gameResult.title}
+                            </h1>
                             <h2 style={{
                                 fontSize: '1.2rem',
                                 fontWeight: '400',
@@ -524,18 +557,35 @@ export const GamePage: React.FC = () => {
 
                             </div>
 
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    style={{
+                                        fontSize: '1rem',
+                                        padding: '0.8rem 2rem',
+                                        background: 'transparent',
+                                        color: '#ccc',
+                                        border: '1px solid #555',
+                                        fontWeight: '700',
+                                        letterSpacing: '0.5px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    VIEW BOARD
+                                </button>
                                 <button
                                     onClick={handleRematch}
                                     style={{
                                         fontSize: '1rem',
                                         padding: '0.8rem 2rem',
-                                        background: gameResult.type === 'win' ? 'var(--color-accent)' : gameResult.type === 'loss' ? 'var(--color-primary)' : '#444',
-                                        color: gameResult.type === 'win' ? '#000' : 'white',
+                                        background: gameResult.type === 'win' ? '#22c55e' : gameResult.type === 'loss' ? 'var(--color-primary)' : '#444',
+                                        color: 'white',
                                         border: 'none',
                                         fontWeight: '700',
                                         letterSpacing: '0.5px',
-                                        minWidth: '140px'
+                                        borderRadius: '8px',
+                                        cursor: 'pointer'
                                     }}
                                 >
                                     REMATCH
@@ -549,7 +599,8 @@ export const GamePage: React.FC = () => {
                                         border: '1px solid rgba(255,255,255,0.1)',
                                         color: '#aaa',
                                         fontWeight: '500',
-                                        minWidth: '140px'
+                                        borderRadius: '8px',
+                                        cursor: 'pointer'
                                     }}
                                 >
                                     EXIT
