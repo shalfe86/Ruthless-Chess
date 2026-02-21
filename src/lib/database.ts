@@ -1,217 +1,187 @@
-// Database helper functions for Ruthless Chess
 import { supabase } from './supabase';
-import type { Game, GameInsert, GameUpdate, Move, MoveInsert, PlayerPreferences, PlayerPreferencesUpdate } from '../types/database';
+import type { UserSession, UserSessionInsert, UserSessionUpdate, Game, GameInsert, GameUpdate, PlatformStats, SiteVisit, SiteVisitInsert, SiteVisitUpdate } from '../types/database';
 
-// ==================== GAMES ====================
+/**
+ * Creates a new user session.
+ */
+export async function createSession(session: UserSessionInsert): Promise<UserSession | null> {
+    try {
+        const { data, error } = await supabase
+            .from('user_sessions')
+            .insert(session)
+            .select()
+            .single();
 
-export async function createGame(game: GameInsert): Promise<Game | null> {
-    const { data, error } = await supabase
-        .from('games')
-        .insert(game)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error creating game:', error);
-        return null;
-    }
-
-    return data;
-}
-
-export async function updateGame(gameId: string, updates: GameUpdate): Promise<Game | null> {
-    const { data, error } = await supabase
-        .from('games')
-        .update(updates)
-        .eq('id', gameId)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error updating game:', error);
-        return null;
-    }
-
-    return data;
-}
-
-export async function getGame(gameId: string): Promise<Game | null> {
-    const { data, error } = await supabase
-        .from('games')
-        .select('*')
-        .eq('id', gameId)
-        .single();
-
-    if (error) {
-        console.error('Error fetching game:', error);
-        return null;
-    }
-
-    return data;
-}
-
-export async function getPlayerGames(playerId: string, limit = 10): Promise<Game[]> {
-    const { data, error } = await supabase
-        .from('games')
-        .select('*')
-        .eq('player_id', playerId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        console.error('Error fetching player games:', error);
-        return [];
-    }
-
-    return data || [];
-}
-
-// ==================== MOVES ====================
-
-export async function createMove(move: MoveInsert): Promise<Move | null> {
-    const { data, error } = await supabase
-        .from('moves')
-        .insert(move)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error creating move:', error);
-        return null;
-    }
-
-    return data;
-}
-
-export async function getGameMoves(gameId: string): Promise<Move[]> {
-    const { data, error } = await supabase
-        .from('moves')
-        .select('*')
-        .eq('game_id', gameId)
-        .order('move_number', { ascending: true });
-
-    if (error) {
-        console.error('Error fetching game moves:', error);
-        return [];
-    }
-
-    return data || [];
-}
-
-export async function updateMove(moveId: string, updates: Partial<Move>): Promise<Move | null> {
-    const { data, error } = await supabase
-        .from('moves')
-        .update(updates)
-        .eq('id', moveId)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error updating move:', error);
-        return null;
-    }
-
-    return data;
-}
-
-// ==================== PLAYER PREFERENCES ====================
-
-export async function getPlayerPreferences(playerId: string): Promise<PlayerPreferences | null> {
-    const { data, error } = await supabase
-        .from('player_preferences')
-        .select('*')
-        .eq('player_id', playerId)
-        .single();
-
-    if (error) {
-        // If no preferences exist, return default values
-        if (error.code === 'PGRST116') {
+        if (error) {
+            console.error('Error creating session:', error);
             return null;
         }
-        console.error('Error fetching player preferences:', error);
+
+        return data;
+    } catch (e) {
+        console.error('Failed to create session:', e);
         return null;
     }
-
-    return data;
-}
-
-export async function upsertPlayerPreferences(preferences: PlayerPreferencesUpdate & { player_id: string }): Promise<PlayerPreferences | null> {
-    const { data, error } = await supabase
-        .from('player_preferences')
-        .upsert(preferences)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error upserting player preferences:', error);
-        return null;
-    }
-
-    return data;
-}
-
-export async function updatePlayerPreferences(playerId: string, updates: PlayerPreferencesUpdate): Promise<PlayerPreferences | null> {
-    const { data, error } = await supabase
-        .from('player_preferences')
-        .update(updates)
-        .eq('player_id', playerId)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error updating player preferences:', error);
-        return null;
-    }
-
-    return data;
-}
-
-// ==================== UTILITY FUNCTIONS ====================
-
-/**
- * Calculate game duration from start and end times
- */
-export function calculateGameDuration(startedAt: string, endedAt: string): number {
-    const start = new Date(startedAt).getTime();
-    const end = new Date(endedAt).getTime();
-    return Math.floor((end - start) / 1000); // Return seconds
 }
 
 /**
- * Convert chess.js move to database move format
+ * Updates an existing user session (wins, losses, draws).
  */
-export function formatMoveForDatabase(
-    gameId: string,
-    moveNumber: number,
-    move: any, // chess.js move object
-    fenBefore: string,
-    fenAfter: string,
-    timeSpentMs: number,
-    timeRemainingMs: number
-): MoveInsert {
-    return {
-        game_id: gameId,
-        move_number: moveNumber,
-        player_color: move.color === 'w' ? 'white' : 'black',
-        move_san: move.san,
-        move_uci: `${move.from}${move.to}${move.promotion || ''}`,
-        fen_before: fenBefore,
-        fen_after: fenAfter,
-        time_spent_ms: timeSpentMs,
-        time_remaining_ms: timeRemainingMs,
-        is_check: move.san.includes('+'),
-        is_checkmate: move.san.includes('#'),
-        is_capture: move.captured !== undefined,
-        is_castling: move.flags.includes('k') || move.flags.includes('q'),
-        is_promotion: move.promotion !== undefined,
-        is_en_passant: move.flags.includes('e'),
-        evaluation_before: null,
-        evaluation_after: null,
-        centipawn_loss: null,
-        best_move: null,
-        classification: null,
-        is_brilliant: false,
-        is_mistake: false,
-        is_blunder: false
-    };
+export async function updateSession(sessionId: string, updates: UserSessionUpdate): Promise<UserSession | null> {
+    try {
+        const { data, error } = await supabase
+            .from('user_sessions')
+            .update({ ...updates, ended_at: new Date().toISOString() })
+            .eq('id', sessionId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error updating session:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to update session:', e);
+        return null;
+    }
+}
+
+/**
+ * Retrieves a user session by ID.
+ */
+export async function getSession(sessionId: string): Promise<UserSession | null> {
+    try {
+        const { data, error } = await supabase
+            .from('user_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+
+        if (error) {
+            console.error('Error fetching session:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to fetch session:', e);
+        return null;
+    }
+}
+
+/**
+ * Creates a new game.
+ */
+export async function createGame(game: GameInsert): Promise<Game | null> {
+    try {
+        const { data, error } = await supabase
+            .from('games')
+            .insert(game)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating game:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to create game:', e);
+        return null;
+    }
+}
+
+/**
+ * Updates an existing game.
+ */
+export async function updateGame(gameId: string, updates: GameUpdate): Promise<Game | null> {
+    try {
+        const { data, error } = await supabase
+            .from('games')
+            .update(updates)
+            .eq('id', gameId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error updating game:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to update game:', e);
+        return null;
+    }
+}
+
+/**
+ * Fetches the platform aggregate stats from the view.
+ */
+export async function getPlatformStats(): Promise<PlatformStats | null> {
+    try {
+        const { data, error } = await supabase
+            .from('platform_stats')
+            .select('*')
+            .single();
+
+        if (error) {
+            console.error('Error fetching platform stats:', error);
+            return null;
+        }
+
+        return data as PlatformStats;
+    } catch (e) {
+        console.error('Failed to fetch platform stats:', e);
+        return null;
+    }
+}
+/**
+ * Creates a new site visit.
+ */
+export async function createVisit(visit: SiteVisitInsert): Promise<SiteVisit | null> {
+    try {
+        const { data, error } = await supabase
+            .from('site_visits')
+            .insert(visit)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating visit:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to create visit:', e);
+        return null;
+    }
+}
+
+/**
+ * Updates an existing site visit.
+ */
+export async function updateVisit(visitId: string, updates: SiteVisitUpdate): Promise<SiteVisit | null> {
+    try {
+        const { data, error } = await supabase
+            .from('site_visits')
+            .update(updates)
+            .eq('id', visitId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error updating visit:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to update visit:', e);
+        return null;
+    }
 }

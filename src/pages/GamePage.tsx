@@ -4,18 +4,15 @@ import { Chessboard } from 'react-chessboard';
 import { Clock, BarChart2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/logo.png';
-import { RuthlessEngine } from '../lib/RuthlessEngine';
-import { createGame, updateGame, createMove, formatMoveForDatabase } from '../lib/database';
-import { supabase } from '../lib/supabase';
-import { calculateGameAnalytics, updatePlayerAnalytics, updatePlayerRating } from '../lib/analytics';
-import { analyzeSingleMove, type MoveAnalysis } from '../lib/moveAnalysis';
-
-const engine = new RuthlessEngine();
+import { getStockfishEngine } from '../lib/stockfish';
+import { createSession, updateSession, createGame, updateGame } from '../lib/database';
+import { getRandomTrashTalk } from '../lib/trashTalk';
 
 export const GamePage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const isGuest = location.state?.isGuest || false;
+    const [difficulty, setDifficulty] = useState<string | null>(null);
+    const username = location.state?.username || 'Anonymous';
 
     const [game, setGame] = useState(new Chess());
     const [fen, setFen] = useState(game.fen());
@@ -28,27 +25,25 @@ export const GamePage: React.FC = () => {
     const [gameOver, setGameOver] = useState(false);
     const [gameResult, setGameResult] = useState<{ title: string, subtitle: string, type: 'win' | 'loss' | 'draw' } | null>(null);
     const [gameStarted, setGameStarted] = useState(false);
-    // const [showCinematic, setShowCinematic] = useState(false);
     const [showModal, setShowModal] = useState(false);
+    const [sessionRecord, setSessionRecord] = useState({ wins: 0, losses: 0, draws: 0 });
 
-    // Analytics stub
+    // Local session tracking
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
-    const [liveAnalysis, setLiveAnalysis] = useState<MoveAnalysis[]>([]);
-    console.log(liveAnalysis); // Keep unused variable for debugging/future use
-    const [liveStats, setLiveStats] = useState({
-        accuracy: 0,
-        mistakes: 0,
-        blunders: 0,
-        brilliant: 0
-    });
 
     // Database tracking
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [currentGameId, setCurrentGameId] = useState<string | null>(null);
-    const [moveCount, setMoveCount] = useState(0);
     const gameStartTimeRef = useRef<Date | null>(null);
 
     const timerRef = useRef<number | null>(null);
     const moveListRef = useRef<HTMLDivElement>(null);
+
+    // Init engine on mount
+    useEffect(() => {
+        const engine = getStockfishEngine();
+        engine.initialize().catch(e => console.error("Failed to init Stockfish on mount:", e));
+    }, []);
 
     // Auto-scroll move list
     useEffect(() => {
@@ -65,14 +60,7 @@ export const GamePage: React.FC = () => {
                 setWhiteTime(t => {
                     if (t <= 0.1) {
                         // Player ran out of time - AI trash talk!
-                        const timeoutTrashTalk = [
-                            "Too slow! Did you fall asleep?",
-                            "Time's up, slowpoke! Maybe set an alarm next time?",
-                            "You ran out of time! I've seen sloths move faster!",
-                            "Tick tock, you lose! Should've thought faster!",
-                            "Out of time AND out of luck! Classic!"
-                        ];
-                        endGame("TIME'S UP", timeoutTrashTalk[Math.floor(Math.random() * timeoutTrashTalk.length)], 'loss');
+                        endGame("TIME'S UP", getRandomTrashTalk('win'), 'loss');
                         return 0;
                     }
                     return t - 0.1;
@@ -81,13 +69,7 @@ export const GamePage: React.FC = () => {
                 setBlackTime(t => {
                     if (t <= 0.1) {
                         // AI ran out of time - Player wins!
-                        const timeoutWinMessages = [
-                            "The AI ran out of time! VICTORY IS YOURS!",
-                            "Time's up for the AI! You outlasted it!",
-                            "The AI couldn't keep up! CONGRATULATIONS!",
-                            "AI timed out! You're too RUTHLESS!"
-                        ];
-                        endGame("TIME FAULT", timeoutWinMessages[Math.floor(Math.random() * timeoutWinMessages.length)], 'win');
+                        endGame("TIME FAULT", getRandomTrashTalk('loss'), 'win');
                         return 0;
                     }
                     return t - 0.1;
@@ -103,53 +85,27 @@ export const GamePage: React.FC = () => {
     const endGame = async (title: string, subtitle: string, type: 'win' | 'loss' | 'draw') => {
         setGameOver(true);
         setGameResult({ title, subtitle, type });
-        // setShowCinematic(true); // DISABLED: Cinematic removed
         setShowModal(true); // Show result immediately
         if (timerRef.current) clearInterval(timerRef.current);
 
+        const newWins = type === 'win' ? sessionRecord.wins + 1 : sessionRecord.wins;
+        const newLosses = type === 'loss' ? sessionRecord.losses + 1 : sessionRecord.losses;
+        const newDraws = type === 'draw' ? sessionRecord.draws + 1 : sessionRecord.draws;
+
+        // Update session record
+        setSessionRecord({ wins: newWins, losses: newLosses, draws: newDraws });
+
+        if (currentSessionId) {
+            await updateSession(currentSessionId, { wins: newWins, losses: newLosses, draws: newDraws });
+        }
+
         // Save final game state to database
-        if (currentGameId && gameStartTimeRef.current) {
-            const endedAt = new Date();
-            const durationSeconds = Math.floor((endedAt.getTime() - gameStartTimeRef.current.getTime()) / 1000);
-
-            // Determine result reason based on title
-            let resultReason: 'checkmate' | 'timeout' | 'stalemate' | 'insufficient_material' = 'checkmate';
-            if (title.includes('TIME')) resultReason = 'timeout';
-            else if (title.includes('DRAW')) resultReason = 'stalemate';
-
-            // Determine winner color
-            let winnerColor: 'white' | 'black' | null = null;
-            if (type === 'win') winnerColor = 'white';
-            else if (type === 'loss') winnerColor = 'black';
-
+        if (currentGameId) {
             await updateGame(currentGameId, {
-                ended_at: endedAt.toISOString(),
-                duration_seconds: durationSeconds,
-                final_fen: game.fen(),
-                pgn: game.pgn(),
-                total_moves: moveCount,
-                result_reason: resultReason,
-                winner_color: winnerColor
+                status: 'completed',
+                result: type
             });
-
-            console.log('✅ Game saved to database:', currentGameId);
-
-            // Calculate and save analytics
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                await calculateGameAnalytics(currentGameId);
-                await updatePlayerAnalytics(user.id);
-                await updatePlayerRating(user.id, currentGameId, type);
-                console.log('📊 Analytics and rating updated');
-
-                // Start engine analysis in background (non-blocking)
-                // This will analyze all moves and update with real accuracy
-                import('../lib/analytics').then(({ analyzeGameWithEngine }) => {
-                    analyzeGameWithEngine(currentGameId).catch((err: Error) => {
-                        console.error('Engine analysis failed:', err);
-                    });
-                });
-            }
+            console.log('✅ Game completed:', currentGameId);
         }
     };
 
@@ -166,46 +122,55 @@ export const GamePage: React.FC = () => {
                 return;
             }
 
-            const fenBefore = currentGame.fen();
-            const moveStartTime = Date.now();
+            let depth = 10;
+            // Map difficulty to Stockfish depths
+            if (difficulty === 'Executioner') {
+                depth = 15;
+            } else if (difficulty === 'Relentless') {
+                depth = 10;
+            } else {
+                depth = 5;  // Initiate or fallback
+            }
 
             // Use the Engine!
-            // We defer to setTimeout in the caller to keep UI snappy, but the valid calc happens here.
             let moveChoice = null;
+            const engine = getStockfishEngine();
             try {
-                const bestMoveSan = engine.getBestMove(currentGame.fen(), 3); // Depth 3 is good for speed/strength balance
-                // Fallback to random if engine returns null
-                moveChoice = bestMoveSan || possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                moveChoice = await engine.getBestMove(currentGame.fen(), { depth });
             } catch (engineError) {
-                console.error("RuthlessEngine critical failure:", engineError);
+                console.error("Stockfish critical failure:", engineError);
                 // Last resort fallback
-                moveChoice = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                moveChoice = randomMove; // SAN format for random
             }
 
             const newGame = new Chess(currentGame.fen());
-            const move = newGame.move(moveChoice);
+            let move = null;
+
+            if (moveChoice && possibleMoves.includes(moveChoice)) {
+                // If fallback generated a SAN string
+                move = newGame.move(moveChoice);
+            } else if (moveChoice && typeof moveChoice === 'string') {
+                // Stockfish returns UCI format (e.g. e2e4 or e7e8q)
+                const from = moveChoice.substring(0, 2);
+                const to = moveChoice.substring(2, 4);
+                const promotion = moveChoice.length === 5 ? moveChoice[4] : undefined;
+
+                try {
+                    move = newGame.move({ from, to, promotion });
+                } catch (e) {
+                    console.error("Error applying UCI move:", moveChoice, e);
+                    move = newGame.move(possibleMoves[Math.floor(Math.random() * possibleMoves.length)]);
+                }
+            } else {
+                move = newGame.move(possibleMoves[Math.floor(Math.random() * possibleMoves.length)]);
+            }
 
             setGame(newGame);
             setFen(newGame.fen());
             if (move) {
                 setMoveHistory(prev => [...prev, `${move.color === 'w' ? 'White' : 'Black'}: ${move.san}`]);
                 console.log(`🤖 AI moved: ${move.san}`);
-
-                // Save AI move to database
-                if (currentGameId) {
-                    const moveTimeMs = Date.now() - moveStartTime;
-                    const moveData = formatMoveForDatabase(
-                        currentGameId,
-                        Math.floor(moveCount / 2) + 1,
-                        move,
-                        fenBefore,
-                        newGame.fen(),
-                        moveTimeMs,
-                        Math.floor(blackTime * 1000)
-                    );
-                    await createMove(moveData);
-                    setMoveCount(prev => prev + 1);
-                }
             }
 
             // Check if AI just delivered checkmate
@@ -214,8 +179,6 @@ export const GamePage: React.FC = () => {
                 return;
             }
 
-            // Trigger analysis for AI move too
-            analyzeSingleMove(moveChoice, fenBefore, newGame.fen()).catch(e => console.error("AI Analysis failed:", e));
 
             // Increment time for Black (AI), capped at 25s
             setBlackTime(t => Math.min(t + 1, 25));
@@ -231,23 +194,10 @@ export const GamePage: React.FC = () => {
         if (gameInstance.isCheckmate()) {
             if (gameInstance.turn() === 'w') {
                 // AI (Black) won
-                const aiTrashTalk = [
-                    "Did you even try? That was embarrassing!",
-                    "I've seen better moves from a toddler!",
-                    "You got absolutely DESTROYED! Better luck next time, champ!",
-                    "That was brutal... for you! Maybe stick to checkers?",
-                    "You just got ROASTED by a bunch of code!"
-                ];
-                endGame("DEFEAT", aiTrashTalk[Math.floor(Math.random() * aiTrashTalk.length)], 'loss');
+                endGame("DEFEAT", getRandomTrashTalk('win'), 'loss');
             } else {
                 // Player (White) won
-                const playerWinMessages = [
-                    "Absolutely RUTHLESS!",
-                    "The AI didn't stand a chance!",
-                    "You're a RUTHLESS CHAMPION!",
-                    "FLAWLESS VICTORY! The AI is speechless!"
-                ];
-                endGame("VICTORY", playerWinMessages[Math.floor(Math.random() * playerWinMessages.length)], 'win');
+                endGame("VICTORY", getRandomTrashTalk('loss'), 'win');
             }
         } else if (gameInstance.isDraw()) {
             endGame('DRAW', 'Stalemate / Insufficient Material', 'draw');
@@ -258,8 +208,6 @@ export const GamePage: React.FC = () => {
         if (gameOver || activeTurn !== playerColor || !targetSquare) return false;
 
         const newGame = new Chess(game.fen());
-        const fenBefore = game.fen();
-        const moveStartTime = Date.now();
 
         try {
             const move = newGame.move({
@@ -277,39 +225,30 @@ export const GamePage: React.FC = () => {
                 setGameStarted(true);
                 gameStartTimeRef.current = new Date();
 
-                // Get current user and create game (async)
+                // Create game and session (async)
                 (async () => {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user) {
-                        const gameRecord = await createGame({
-                            player_id: user.id,
-                            opponent_type: 'ai',
-                            opponent_id: null,
-                            ai_difficulty: 3, // Default difficulty
-                            ai_engine_version: '1.0',
-                            time_control_initial: 25,
-                            time_control_increment: 1,
-                            player_color: 'white',
-                            result: 'loss', // Will be updated at end
-                            result_reason: null,
-                            winner_color: null,
-                            total_moves: 0,
-                            duration_seconds: null,
-                            final_fen: null,
-                            pgn: null,
-                            analysis_status: 'pending',
-                            analysis_completed_at: null,
-                            opening_eco: null,
-                            opening_name: null,
-                            opening_variation: null,
-                            started_at: gameStartTimeRef.current!.toISOString(),
-                            ended_at: null
-                        });
+                    let sessionId = currentSessionId;
 
-                        if (gameRecord) {
-                            setCurrentGameId(gameRecord.id);
-                            console.log('🎮 Game created:', gameRecord.id);
+                    if (!sessionId) {
+                        const sessionRecord = await createSession({ username });
+                        if (sessionRecord) {
+                            sessionId = sessionRecord.id;
+                            setCurrentSessionId(sessionId);
+                            console.log('👤 Session created:', sessionId);
                         }
+                    }
+
+                    const gameRecord = await createGame({
+                        session_id: sessionId,
+                        username: username,
+                        difficulty: difficulty || 'Initiate',
+                        status: 'active',
+                        result: null
+                    });
+
+                    if (gameRecord) {
+                        setCurrentGameId(gameRecord.id);
+                        console.log('🎮 Game Started:', gameRecord.id);
                     }
                 })().catch(e => console.error("Game/Move creation error:", e));
             }
@@ -318,50 +257,6 @@ export const GamePage: React.FC = () => {
             setFen(newGame.fen());
             setMoveHistory(prev => [...prev, `${move.color === 'w' ? 'White' : 'Black'}: ${move.san}`]);
 
-            // Save move to database (async, non-blocking)
-            if (currentGameId) {
-                const moveTimeMs = Date.now() - moveStartTime;
-                const moveData = formatMoveForDatabase(
-                    currentGameId,
-                    Math.floor(moveCount / 2) + 1,
-                    move,
-                    fenBefore,
-                    newGame.fen(),
-                    moveTimeMs,
-                    Math.floor(whiteTime * 1000)
-                );
-                createMove(moveData).then(() => {
-                    setMoveCount(prev => prev + 1);
-                }).catch(e => console.error("Move save error:", e));
-            }
-
-            // Trigger live analysis (non-blocking)
-            analyzeSingleMove(move.san, fenBefore, newGame.fen()).then(analysis => {
-                if (analysis) {
-                    setLiveAnalysis(prev => {
-                        const newAnalysis = [...prev, analysis];
-                        // Update stats
-                        const mistakes = newAnalysis.filter(a => a.is_mistake).length;
-                        const blunders = newAnalysis.filter(a => a.is_blunder).length;
-                        const brilliant = newAnalysis.filter(a => a.is_brilliant).length;
-
-                        // Simple accuracy estimate for live view (real one calculated at end)
-                        // accuracy = 100 - (avg_cpl / 10)
-                        const totalCpl = newAnalysis.reduce((sum, a) => sum + a.centipawn_loss, 0);
-                        const accuracy = Math.max(0, Math.min(100, 100 - (totalCpl / newAnalysis.length / 10)));
-
-                        setLiveStats({
-                            accuracy: Math.round(accuracy),
-                            mistakes,
-                            blunders,
-                            brilliant
-                        });
-
-                        return newAnalysis;
-                    });
-                }
-            }).catch(e => console.error("Live analysis failed:", e));
-
             // Increment time for White (Player), capped at 25s
             setWhiteTime(t => Math.min(t + 1, 25));
             setActiveTurn('b');
@@ -369,13 +264,7 @@ export const GamePage: React.FC = () => {
             if (newGame.isGameOver()) {
                 if (newGame.isCheckmate()) {
                     // If game is over after player's move, player checkmated the AI
-                    const playerWinMessages = [
-                        "You're absolutely RUTHLESS!",
-                        "The AI bows to your skill!",
-                        "You showed no mercy!",
-                        "The AI never saw it coming!"
-                    ];
-                    endGame("CHECKMATE", playerWinMessages[Math.floor(Math.random() * playerWinMessages.length)], 'win');
+                    endGame("CHECKMATE", getRandomTrashTalk('loss'), 'win');
                 } else {
                     endGame('DRAW', 'Stalemate / Repetition', 'draw');
                 }
@@ -390,7 +279,22 @@ export const GamePage: React.FC = () => {
             console.error("Move drop error:", error);
             return false;
         }
-    }, [game, gameOver, activeTurn, playerColor, gameStarted, currentGameId, moveCount, whiteTime]);
+    }, [game, gameOver, activeTurn, playerColor, gameStarted, currentGameId, whiteTime, difficulty, username, currentSessionId]);
+
+    const handleRematch = () => {
+        setGame(new Chess());
+        setFen(new Chess().fen());
+        setWhiteTime(25);
+        setBlackTime(25);
+        setActiveTurn('w');
+        setGameOver(false);
+        setGameResult(null);
+        setGameStarted(false);
+        setShowModal(false);
+        setMoveHistory([]);
+        setCurrentGameId(null);
+        gameStartTimeRef.current = null;
+    };
 
     // Media query hook
     const isMobile = useMedia('(max-width: 768px)');
@@ -423,7 +327,7 @@ export const GamePage: React.FC = () => {
         <div style={containerStyle}>
             {/* Quit Button - positioned slightly differently on mobile */}
             <button
-                onClick={() => navigate(isGuest ? '/' : '/arena')}
+                onClick={() => navigate('/')}
                 style={{
                     position: isMobile ? 'absolute' : 'absolute',
                     top: isMobile ? '0.5rem' : '1rem',
@@ -438,7 +342,7 @@ export const GamePage: React.FC = () => {
                     zIndex: 100
                 }}
             >
-                {isGuest ? '← Home' : '← Leave'}
+                ← Home
             </button>
 
             {/* Left Panel: Opponent Info & Analytics - Mobile: Collapsible or Stacked? Stacked for now, simplified */}
@@ -450,42 +354,25 @@ export const GamePage: React.FC = () => {
 
                     <div className="opponent-card" style={cardStyle}>
                         <h3>Ruthless AI (Bot)</h3>
-                        <div style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>Rank: ???</div>
+                        <div style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>Level {difficulty}</div>
                     </div>
 
                     <div className="analytics-card" style={{ ...cardStyle, marginTop: 'auto' }}>
-                        <h4><BarChart2 size={16} style={{ display: 'inline', marginRight: 8 }} /> Live Analytics</h4>
-                        <p style={{ fontSize: '0.9rem', color: '#888' }}>Real-time engine evaluation</p>
+                        <h4><BarChart2 size={16} style={{ display: 'inline', marginRight: 8 }} /> Session</h4>
+                        <p style={{ fontSize: '0.9rem', color: '#888' }}>Persistent across rematches</p>
                         <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                            <div>Accuracy: <span style={{ color: liveStats.accuracy > 80 ? '#22c55e' : liveStats.accuracy > 50 ? '#eab308' : '#ef4444', fontWeight: 'bold' }}>{liveStats.accuracy > 0 ? `${liveStats.accuracy}%` : '-'}</span></div>
-                            <div>Brilliant: <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{liveStats.brilliant}</span></div>
-                            <div>Mistakes: <span style={{ color: '#eab308', fontWeight: 'bold' }}>{liveStats.mistakes}</span></div>
-                            <div>Blunders: <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{liveStats.blunders}</span></div>
+                            <div>Wins: <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{sessionRecord.wins}</span></div>
+                            <div>Draws: <span style={{ color: '#aaa', fontWeight: 'bold' }}>{sessionRecord.draws}</span></div>
+                            <div>Losses: <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{sessionRecord.losses}</span></div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Mobile Header: Opponent Info & Sign Up */}
+            {/* Mobile Header: Opponent Info */}
             {isMobile && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.5rem' }}>
                     <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>Vs. Ruthless AI</div>
-                    {isGuest && (
-                        <button
-                            onClick={() => navigate('/pricing')}
-                            style={{
-                                background: 'var(--color-primary)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                padding: '0.3rem 0.8rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            Sign Up
-                        </button>
-                    )}
                 </div>
             )}
 
@@ -500,7 +387,28 @@ export const GamePage: React.FC = () => {
                 height: isMobile ? 'auto' : '100%'
             }}>
 
-                {!gameStarted && !gameOver && (
+                {difficulty === null && (
+                    <div style={{
+                        position: 'absolute',
+                        zIndex: 200,
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.85)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backdropFilter: 'blur(5px)'
+                    }}>
+                        <h2 style={{ color: 'white', marginBottom: '2rem', fontSize: '2rem' }}>Select AI Strength</h2>
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            <button onClick={() => setDifficulty('Initiate')} style={{ padding: '1rem 2rem', fontSize: '1.2rem', background: 'transparent', border: '1px solid #444', color: '#ccc', cursor: 'pointer', borderRadius: '8px' }}>Initiate</button>
+                            <button onClick={() => setDifficulty('Relentless')} style={{ padding: '1rem 2rem', fontSize: '1.2rem', background: 'var(--color-primary)', color: 'white', border: 'none', boxShadow: 'var(--shadow-glow)', cursor: 'pointer', borderRadius: '8px', fontWeight: 'bold' }}>Relentless</button>
+                            <button onClick={() => setDifficulty('Executioner')} style={{ padding: '1rem 2rem', fontSize: '1.2rem', background: 'transparent', border: '1px solid #dc2626', color: '#dc2626', cursor: 'pointer', borderRadius: '8px' }}>Executioner</button>
+                        </div>
+                    </div>
+                )}
+
+                {difficulty !== null && !gameStarted && !gameOver && (
                     <div style={{
                         position: 'absolute',
                         zIndex: 10,
@@ -539,18 +447,6 @@ export const GamePage: React.FC = () => {
 
                 {/* Player Timer */}
                 <TimerDisplay time={whiteTime} isActive={activeTurn === 'w'} label="YOU" isMobile={isMobile} />
-
-                {/* Cinematic Overlay Trigger - DISABLED */}
-                {/* {showCinematic && gameResult && (
-                    <CinematicOverlay
-                        resultType={gameResult.type}
-                        onFinish={() => {
-                            setShowCinematic(false);
-                            setShowModal(true);
-                        }}
-                    />
-                )} */}
-                {/* Instead, directly show modal when game ends settings are handled in endGame */}
 
                 {/* Fading Backdrop (only visible when modal is) */}
                 {/* REMOVED: Separate backdrop causing click blocking issues. The Modal below handles its own backdrop. */}
@@ -593,69 +489,34 @@ export const GamePage: React.FC = () => {
                             <div style={{ position: 'relative' }}>
                                 <div style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                                    gridTemplateColumns: '1fr 1fr 1fr',
                                     gap: '1rem',
                                     marginBottom: '2.5rem',
                                     background: 'rgba(255,255,255,0.05)',
                                     padding: '1rem',
-                                    borderRadius: '12px',
-                                    filter: isGuest ? 'blur(8px)' : 'none',
-                                    opacity: isGuest ? 0.6 : 1
+                                    borderRadius: '12px'
                                 }}>
                                     <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Accuracy</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: liveStats.accuracy > 80 ? '#22c55e' : '#fff' }}>
-                                            {liveStats.accuracy}%
-                                        </div>
+                                        <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>Wins</div>
+                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#22c55e' }}>{sessionRecord.wins}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>Draws</div>
+                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#aaa' }}>{sessionRecord.draws}</div>
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Brilliant</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#22c55e' }}>{liveStats.brilliant}</div>
-                                    </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Mistakes</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#eab308' }}>{liveStats.mistakes}</div>
-                                    </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Blunders</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ef4444' }}>{liveStats.blunders}</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>Losses</div>
+                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#dc2626' }}>{sessionRecord.losses}</div>
                                     </div>
                                 </div>
 
-                                {isGuest && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        transform: 'translate(-50%, -50%)',
-                                        zIndex: 10,
-                                        width: '100%',
-                                        textAlign: 'center'
-                                    }}>
-                                        <p style={{ fontWeight: 'bold', marginBottom: '1rem', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                                            Sign up to see your analytics
-                                        </p>
-                                        <button
-                                            onClick={() => navigate('/pricing')}
-                                            style={{
-                                                padding: '0.6rem 1.2rem',
-                                                background: 'var(--color-primary)',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            Unlock Stats
-                                        </button>
-                                    </div>
-                                )}
+                                {/* Grade Display Removed per requirements */}
+
                             </div>
 
                             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                                 <button
-                                    onClick={() => window.location.reload()}
+                                    onClick={handleRematch}
                                     style={{
                                         fontSize: '1rem',
                                         padding: '0.8rem 2rem',
@@ -670,7 +531,7 @@ export const GamePage: React.FC = () => {
                                     REMATCH
                                 </button>
                                 <button
-                                    onClick={() => navigate(isGuest ? '/' : '/arena')}
+                                    onClick={() => navigate('/')}
                                     style={{
                                         fontSize: '1rem',
                                         padding: '0.8rem 2rem',
@@ -721,15 +582,14 @@ export const GamePage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Mobile Analytics (Moved from side to bottom) */}
+            {/* Mobile Analytics (Replaced with Session Stats) */}
             {isMobile && (
                 <div className="analytics-card" style={{ ...cardStyle, order: 4 }}>
-                    <h4 style={{ fontSize: '0.9rem' }}><BarChart2 size={14} style={{ display: 'inline', marginRight: 8 }} /> Live Analytics</h4>
+                    <h4 style={{ fontSize: '0.9rem' }}><BarChart2 size={14} style={{ display: 'inline', marginRight: 8 }} /> Session</h4>
                     <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                        <div>Acc: <span style={{ color: liveStats.accuracy > 80 ? '#22c55e' : liveStats.accuracy > 50 ? '#eab308' : '#ef4444', fontWeight: 'bold' }}>{liveStats.accuracy > 0 ? `${liveStats.accuracy}%` : '-'}</span></div>
-                        <div>💎 <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{liveStats.brilliant}</span></div>
-                        <div>❓ <span style={{ color: '#eab308', fontWeight: 'bold' }}>{liveStats.mistakes}</span></div>
-                        <div>❌ <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{liveStats.blunders}</span></div>
+                        <div>Wins: <span style={{ color: '#22c55e', fontWeight: 'bold' }}>{sessionRecord.wins}</span></div>
+                        <div>Draws: <span style={{ color: '#aaa', fontWeight: 'bold' }}>{sessionRecord.draws}</span></div>
+                        <div>Losses: <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{sessionRecord.losses}</span></div>
                     </div>
                 </div>
             )}

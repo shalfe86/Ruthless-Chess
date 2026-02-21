@@ -10,15 +10,22 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         {
-          src: 'node_modules/stockfish/src/stockfish-17.1-lite-single-03e3232.js',
-          dest: '.',
-          rename: 'stockfish.js'
+          src: 'node_modules/stockfish.js/stockfish.js',
+          dest: '.'
+        },
+        {
+          src: 'node_modules/stockfish.js/stockfish.wasm',
+          dest: '.'
+        },
+        {
+          src: 'node_modules/stockfish.js/stockfish.wasm.js',
+          dest: '.'
         }
       ]
     })
   ],
   optimizeDeps: {
-    exclude: ['stockfish']
+    exclude: ['stockfish.js']
   },
   server: {
     fs: {

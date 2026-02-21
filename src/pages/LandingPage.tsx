@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Swords, Crown, Zap } from 'lucide-react';
 import logo from '../assets/logo.png';
@@ -6,10 +6,11 @@ import heroBg from '../assets/hero-bg.jpg';
 
 export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
+    const [showUsernameInput, setShowUsernameInput] = useState(false);
+    const [username, setUsername] = useState(() => localStorage.getItem('ruthless_username') || '');
 
     return (
         <div className="landing-container" style={{ overflowX: 'hidden', background: '#000' }}>
-
 
             {/* Background Container */}
             <div className="hero-bg-container">
@@ -18,9 +19,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             <nav style={{ display: 'flex', justifyContent: 'flex-end', padding: '1.5rem 2rem', alignItems: 'center', position: 'relative', zIndex: 10 }}>
-                <div className="landing-content-static">
-                    <button onClick={() => navigate('/login')} style={{ background: 'transparent', border: '1px solid #333' }}>Login</button>
-                </div>
+                {/* Empty nav for future expansion */}
             </nav>
 
             <div className="hero-section" style={{
@@ -46,37 +45,113 @@ export const LandingPage: React.FC = () => {
 
                 <div className="landing-content-static" style={{ position: 'relative', zIndex: 5 }}>
                     <p style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', maxWidth: '600px', margin: '0 auto 3rem' }}>
-                        The fastest, most brutal chess platform. 25-second blitz matches.
-                        Advanced AI Ranking. Tournaments for the elite.
+                        The fastest, most brutal chess platform. 25-second blitz matches against an unforgiving AI.
                     </p>
 
-                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                        <button
-                            onClick={() => navigate('/pricing')}
-                            style={{
-                                padding: '1rem 3rem',
-                                fontSize: '1.2rem',
-                                background: 'var(--color-primary)',
-                                color: 'white',
-                                border: 'none',
-                                boxShadow: 'var(--shadow-glow)',
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            Sign Up
-                        </button>
-                        <button
-                            onClick={() => navigate('/game', { state: { isGuest: true } })}
-                            style={{
-                                padding: '1rem 3rem',
-                                fontSize: '1.2rem',
-                                background: 'transparent',
-                                border: '1px solid #444',
-                                color: '#ccc'
-                            }}
-                        >
-                            Guest Play
-                        </button>
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', minHeight: '60px' }}>
+                        {!showUsernameInput ? (
+                            <>
+                                <button
+                                    onClick={() => navigate('/game', { state: { username: 'Anonymous' } })}
+                                    style={{
+                                        padding: '1rem 2rem',
+                                        fontSize: '1.2rem',
+                                        background: 'transparent',
+                                        border: '1px solid #444',
+                                        color: '#ccc',
+                                        cursor: 'pointer',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    Just Play
+                                </button>
+                                <button
+                                    onClick={() => setShowUsernameInput(true)}
+                                    style={{
+                                        padding: '1rem 2rem',
+                                        fontSize: '1.2rem',
+                                        background: 'var(--color-primary)',
+                                        color: 'white',
+                                        border: 'none',
+                                        boxShadow: 'var(--shadow-glow)',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        borderRadius: '8px'
+                                    }}
+                                >
+                                    Play with Username
+                                </button>
+                            </>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '400px' }}>
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const finalName = username.trim();
+                                        if (finalName) {
+                                            localStorage.setItem('ruthless_username', finalName);
+                                        }
+                                        navigate('/game', { state: { username: finalName || 'Anonymous' } });
+                                    }}
+                                    style={{ display: 'flex', gap: '1rem', width: '100%' }}
+                                >
+                                    <input
+                                        type="text"
+                                        placeholder="Enter username..."
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        autoFocus
+                                        maxLength={20}
+                                        style={{
+                                            flex: 1,
+                                            padding: '1rem',
+                                            fontSize: '1.2rem',
+                                            background: 'rgba(255,255,255,0.1)',
+                                            border: '1px solid #555',
+                                            color: 'white',
+                                            borderRadius: '8px',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                    <button
+                                        type="submit"
+                                        style={{
+                                            padding: '1rem 2rem',
+                                            fontSize: '1.2rem',
+                                            background: 'var(--color-primary)',
+                                            color: 'white',
+                                            border: 'none',
+                                            boxShadow: 'var(--shadow-glow)',
+                                            fontWeight: 'bold',
+                                            cursor: 'pointer',
+                                            borderRadius: '8px'
+                                        }}
+                                    >
+                                        Start
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowUsernameInput(false)}
+                                        style={{
+                                            padding: '1rem',
+                                            fontSize: '1.2rem',
+                                            background: 'transparent',
+                                            color: '#aaa',
+                                            border: '1px solid #444',
+                                            cursor: 'pointer',
+                                            borderRadius: '8px'
+                                        }}
+                                        title="Cancel"
+                                    >
+                                        X
+                                    </button>
+                                </form>
+                                <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#aaa' }}>
+                                    Enter a username to be eligible for <strong>shout-outs</strong> on our social media for your best sessions!
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -97,14 +172,14 @@ export const LandingPage: React.FC = () => {
                     desc="25s + 1s increment. No time to think, only react. Prove your instinct."
                 />
                 <FeatureCard
-                    icon={<Swords size={32} color="var(--color-primary)" />}
-                    title="Duels & Tournaments"
-                    desc="Premium players unlock bracket tournaments and 1v1 high-stakes duels."
+                    icon={<Crown size={32} color="var(--color-primary)" />}
+                    title="Pure AI Gameplay"
+                    desc="Challenge the Ruthless Engine. Three difficulties carefully calibrated to crush you."
                 />
                 <FeatureCard
-                    icon={<Crown size={32} color="var(--color-primary)" />}
-                    title="Skill Rating"
-                    desc="Play VS our Ruthless AI to establish your true ranking. It's tougher than anything you've seen."
+                    icon={<Swords size={32} color="var(--color-primary)" />}
+                    title="Frictionless Play"
+                    desc="No accounts. No signups. No wallets. Just instant, brutal chess action."
                 />
             </div>
         </div>

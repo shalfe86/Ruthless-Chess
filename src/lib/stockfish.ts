@@ -19,211 +19,189 @@ export interface EngineConfig {
     threads?: number;     // Number of threads (default: 1)
 }
 
+type CommandTask = {
+    type: 'evaluate' | 'uci';
+    payload?: any;
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
+    internalState?: any;
+};
+
 export class StockfishEngine {
-    private engine: any = null;
+    private engine: Worker | null = null;
     private ready: boolean = false;
-    private initPromise: Promise<void> | null = null;
+    private queue: CommandTask[] = [];
+    private isProcessing: boolean = false;
 
     /**
      * Initialize the Stockfish engine
-     * This is called automatically when needed, but can be called manually for pre-loading
      */
     async initialize(): Promise<void> {
-        if (this.ready) return;
-        if (this.initPromise) return this.initPromise;
+        if (this.engine) return;
 
-        this.initPromise = new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             try {
-                // Initialize worker from public static file
-                // This avoids build-time resolution issues with the stockfish package
+                console.log('🧠 Initializing Stockfish engine...');
+
+                // Use local Stockfish.js file (copied from node_modules to public/)
+                // This avoids CORS issues with Web Workers
                 const worker = new Worker('/stockfish.js');
                 this.engine = worker;
 
-                // Wait for engine to be ready
-                this.engine.onmessage = (event: MessageEvent) => {
+                this.engine.onmessage = this.handleEngineMessage.bind(this);
+                this.engine.onerror = (err) => {
+                    console.error("❌ Stockfish Worker Error:", err);
+                    reject(new Error(`Stockfish initialization failed: ${err.message || 'Unknown error'}`));
+                };
+
+                // temporary handler for initialization only
+                const initHandler = (event: MessageEvent) => {
                     const message = event.data || event;
-                    if (message === 'uciok' || message.includes('uciok')) {
+                    console.log('🧠 Stockfish message:', message);
+
+                    if (typeof message === 'string' && (message === 'uciok' || message.includes('uciok'))) {
                         this.ready = true;
-                        console.log('🧠 Stockfish engine initialized');
+                        this.engine?.removeEventListener('message', initHandler);
+                        console.log('✅ Stockfish engine initialized successfully');
                         resolve();
+                        this.processQueue();
                     }
                 };
 
-                // Initialize UCI protocol
+                // We need to add the listener specifically for init
+                // The main handler `handleEngineMessage` is also active but will ignore messages if no current task
+                this.engine.addEventListener('message', initHandler);
+
+                console.log('🧠 Sending UCI command...');
                 this.engine.postMessage('uci');
 
-                // Timeout after 10 seconds
+                // Timeout
                 setTimeout(() => {
                     if (!this.ready) {
-                        reject(new Error('Stockfish initialization timeout'));
+                        console.error('❌ Stockfish initialization timeout');
+                        reject(new Error('Stockfish initialization timeout - engine did not respond within 10 seconds'));
                     }
-                }, 10000);
+                }, 10000); // Increased to 10s for slower connections
             } catch (error) {
+                console.error('❌ Failed to create Stockfish worker:', error);
                 reject(error);
             }
         });
+    }
 
-        return this.initPromise;
+    private handleEngineMessage(event: MessageEvent) {
+        if (!this.currentTask) return;
+
+        const message = event.data;
+        if (typeof message !== 'string') return;
+
+        // Pass message to current task's specific handler logic
+        // We accumulate data until the task is "done"
+        if (this.currentTask.type === 'evaluate') {
+            const task = this.currentTask;
+            const evalState = task.internalState as Partial<EngineEvaluation>;
+
+            // Extract evaluation score
+            if (message.includes('score cp')) {
+                const match = message.match(/score cp (-?\d+)/);
+                if (match) evalState.score = parseInt(match[1]);
+            }
+            if (message.includes('score mate')) {
+                const match = message.match(/score mate (-?\d+)/);
+                if (match) {
+                    const mateIn = parseInt(match[1]);
+                    evalState.mate = mateIn;
+                    evalState.score = mateIn > 0 ? 10000 : -10000;
+                }
+            }
+            if (message.includes('depth')) {
+                const match = message.match(/depth (\d+)/);
+                if (match) evalState.depth = parseInt(match[1]);
+            }
+            if (message.includes('pv')) {
+                const pvMatch = message.match(/pv (.+)/);
+                if (pvMatch) evalState.pv = pvMatch[1].split(' ');
+            }
+            if (message.startsWith('bestmove')) {
+                const match = message.match(/bestmove (\S+)/);
+                if (match) evalState.bestMove = match[1];
+
+                // Task Complete
+                task.resolve(evalState as EngineEvaluation);
+                this.currentTask = null;
+                this.processQueue();
+            }
+        }
+    }
+
+    private currentTask: (CommandTask & { internalState?: any }) | null = null;
+
+    private async processQueue() {
+        if (this.isProcessing || this.queue.length === 0 || !this.ready) return;
+
+        this.isProcessing = true;
+        const task = this.queue.shift()!;
+        this.currentTask = task;
+
+        try {
+            if (task.type === 'evaluate') {
+                const { fen, depth } = task.payload;
+                task.internalState = { score: 0, bestMove: '', depth: 0, pv: [] }; // Reset state
+                this.engine?.postMessage(`position fen ${fen}`);
+                this.engine?.postMessage(`go depth ${depth}`);
+            }
+        } catch (err) {
+            task.reject(err);
+            this.currentTask = null;
+            this.processQueue();
+        }
+
+        this.isProcessing = false;
     }
 
     /**
      * Evaluate a chess position
-     * @param fen - Position in FEN notation
-     * @param config - Engine configuration
-     * @returns Evaluation with score and best move
      */
     async evaluatePosition(fen: string, config: EngineConfig = {}): Promise<EngineEvaluation> {
         await this.initialize();
 
-        const depth = config.depth || 15;
-        const timeLimit = config.timeLimit || 2000;
-
         return new Promise((resolve, reject) => {
-            let evaluation: Partial<EngineEvaluation> = {
-                score: 0,
-                bestMove: '',
-                depth: 0,
-                pv: []
-            };
-
-            const timeout = setTimeout(() => {
-                reject(new Error('Engine evaluation timeout'));
-            }, timeLimit + 1000);
-
-            this.engine.onmessage = (event: MessageEvent) => {
-                const message = event.data || event;
-
-                // Parse engine output
-                if (typeof message === 'string') {
-                    // Extract evaluation score
-                    if (message.includes('score cp')) {
-                        const match = message.match(/score cp (-?\d+)/);
-                        if (match) {
-                            evaluation.score = parseInt(match[1]);
-                        }
-                    }
-
-                    // Extract mate score
-                    if (message.includes('score mate')) {
-                        const match = message.match(/score mate (-?\d+)/);
-                        if (match) {
-                            evaluation.mate = parseInt(match[1]);
-                            // Convert mate to centipawn equivalent (very high/low score)
-                            evaluation.score = evaluation.mate > 0 ? 10000 : -10000;
-                        }
-                    }
-
-                    // Extract depth
-                    if (message.includes('depth')) {
-                        const match = message.match(/depth (\d+)/);
-                        if (match) {
-                            evaluation.depth = parseInt(match[1]);
-                        }
-                    }
-
-                    // Extract principal variation
-                    if (message.includes('pv')) {
-                        const pvMatch = message.match(/pv (.+)/);
-                        if (pvMatch) {
-                            evaluation.pv = pvMatch[1].split(' ');
-                        }
-                    }
-
-                    // Extract best move from final output
-                    if (message.startsWith('bestmove')) {
-                        const match = message.match(/bestmove (\S+)/);
-                        if (match) {
-                            evaluation.bestMove = match[1];
-                            clearTimeout(timeout);
-                            resolve(evaluation as EngineEvaluation);
-                        }
-                    }
-                }
-            };
-
-            // Send commands to engine
-            this.engine.postMessage(`position fen ${fen}`);
-            this.engine.postMessage(`go depth ${depth}`);
+            this.queue.push({
+                type: 'evaluate',
+                payload: { fen, depth: config.depth || 15 },
+                resolve,
+                reject
+            });
+            this.processQueue();
         });
     }
 
     /**
      * Get the best move for a position
-     * @param fen - Position in FEN notation
-     * @param config - Engine configuration
-     * @returns Best move in UCI format
      */
     async getBestMove(fen: string, config: EngineConfig = {}): Promise<string> {
         const evaluation = await this.evaluatePosition(fen, config);
         return evaluation.bestMove;
     }
 
-    /**
-     * Analyze a specific move and return its centipawn loss
-     * @param fenBefore - Position before the move
-     * @param fenAfter - Position after the move
-     * @param config - Engine configuration
-     * @returns Centipawn loss (positive = worse position)
-     */
-    async analyzeMove(fenBefore: string, fenAfter: string, config: EngineConfig = {}): Promise<number> {
-        // Evaluate position before move
-        const evalBefore = await this.evaluatePosition(fenBefore, config);
-
-        // Evaluate position after move
-        const evalAfter = await this.evaluatePosition(fenAfter, config);
-
-        // Calculate centipawn loss
-        // Note: We need to flip the sign for black's moves
-        const isWhiteToMove = fenBefore.split(' ')[1] === 'w';
-        const scoreBefore = isWhiteToMove ? evalBefore.score : -evalBefore.score;
-        const scoreAfter = isWhiteToMove ? -evalAfter.score : evalAfter.score;
-
-        const centipawnLoss = Math.max(0, scoreBefore - scoreAfter);
-
-        return centipawnLoss;
-    }
-
-    /**
-     * Terminate the engine and clean up resources
-     */
     terminate(): void {
         if (this.engine) {
-            this.engine.postMessage('quit');
+            this.engine.terminate();
             this.engine = null;
             this.ready = false;
-            this.initPromise = null;
+            this.queue = [];
+            this.currentTask = null;
             console.log('🧠 Stockfish engine terminated');
         }
-    }
-
-    /**
-     * Check if engine is ready
-     */
-    isReady(): boolean {
-        return this.ready;
     }
 }
 
 // Singleton instance for global use
 let engineInstance: StockfishEngine | null = null;
 
-/**
- * Get the global Stockfish engine instance
- * Creates a new instance if one doesn't exist
- */
 export function getStockfishEngine(): StockfishEngine {
     if (!engineInstance) {
         engineInstance = new StockfishEngine();
     }
     return engineInstance;
-}
-
-/**
- * Terminate the global engine instance
- */
-export function terminateStockfishEngine(): void {
-    if (engineInstance) {
-        engineInstance.terminate();
-        engineInstance = null;
-    }
 }
