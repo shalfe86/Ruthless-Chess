@@ -205,7 +205,7 @@ export const GamePage: React.FC = () => {
         }
     }
 
-    const onDrop = React.useCallback(({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string | null; piece: { isSparePiece: boolean; position: string; pieceType: string } }) => {
+    const onDrop = React.useCallback(({ sourceSquare, targetSquare }: { sourceSquare: string, targetSquare: string | null }) => {
         if (gameOver || activeTurn !== playerColor || !targetSquare) return false;
 
         const newGame = new Chess(game.fen());
@@ -442,7 +442,15 @@ export const GamePage: React.FC = () => {
                             boardStyle: {
                                 borderRadius: '4px',
                                 boxShadow: '0 0 20px rgba(0,0,0,0.5)'
-                            }
+                            },
+                            squareStyles: (game.isCheck() && activeTurn === playerColor) ? {
+                                // Find the player's king square dynamically
+                                [game.board().flat().find(p => p && p.type === 'k' && p.color === playerColor)?.square || 'e1']: {
+                                    background: 'radial-gradient(circle, rgba(255,0,0,0.8) 0%, rgba(200,0,0,0.4) 100%)',
+                                    borderRadius: '50%',
+                                    boxShadow: 'inset 0 0 10px rgba(255, 0, 0, 0.8), 0 0 15px red'
+                                }
+                            } : {}
                         }}
                     />
                 </div>
