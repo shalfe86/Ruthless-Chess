@@ -60,7 +60,7 @@ export const GamePage: React.FC = () => {
                 setWhiteTime(t => {
                     if (t <= 0.1) {
                         // Player ran out of time - AI trash talk!
-                        endGame("TIME'S UP", getRandomTrashTalk('win'), 'loss');
+                        endGame("TIME'S UP", getRandomTrashTalk('loss'), 'loss');
                         return 0;
                     }
                     return t - 0.1;
@@ -69,7 +69,7 @@ export const GamePage: React.FC = () => {
                 setBlackTime(t => {
                     if (t <= 0.1) {
                         // AI ran out of time - Player wins!
-                        endGame("TIME FAULT", getRandomTrashTalk('loss'), 'win');
+                        endGame("TIME FAULT", getRandomTrashTalk('win'), 'win');
                         return 0;
                     }
                     return t - 0.1;
@@ -195,10 +195,10 @@ export const GamePage: React.FC = () => {
         if (gameInstance.isCheckmate()) {
             if (gameInstance.turn() === 'w') {
                 // AI (Black) won
-                endGame("CHECKMATED", getRandomTrashTalk('win'), 'loss');
+                endGame("CHECKMATED", getRandomTrashTalk('loss'), 'loss');
             } else {
                 // Player (White) won
-                endGame("CHECKMATE - YOU WIN", getRandomTrashTalk('loss'), 'win');
+                endGame("CHECKMATE - YOU WIN", getRandomTrashTalk('win'), 'win');
             }
         } else if (gameInstance.isDraw()) {
             endGame('DRAW', 'Stalemate / Insufficient Material', 'draw');
@@ -266,7 +266,7 @@ export const GamePage: React.FC = () => {
             if (newGame.isGameOver()) {
                 if (newGame.isCheckmate()) {
                     // If game is over after player's move, player checkmated the AI
-                    endGame("CHECKMATE - YOU WIN", getRandomTrashTalk('loss'), 'win');
+                    endGame("CHECKMATE - YOU WIN", getRandomTrashTalk('win'), 'win');
                 } else {
                     endGame('DRAW', 'Stalemate / Repetition', 'draw');
                 }
