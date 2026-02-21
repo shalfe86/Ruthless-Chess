@@ -6,6 +6,18 @@ CREATE TABLE site_visits (
     last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Enable RLS for site_visits
+ALTER TABLE site_visits ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable insert for anonymous users" ON site_visits
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Enable update for anonymous users" ON site_visits
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Enable select for anonymous users" ON site_visits
+    FOR SELECT USING (true);
+
 -- Update platform_stats view to include unique visitors and average time
 DROP VIEW platform_stats;
 CREATE OR REPLACE VIEW platform_stats AS
